@@ -1,0 +1,10 @@
+.env
+bus_data/
+__pycache__/
+*.pyc
+*.pdf
+*.jpg
+*-backup*.py
+*-backup*.html
+index-before-*.html
+.DS_Store

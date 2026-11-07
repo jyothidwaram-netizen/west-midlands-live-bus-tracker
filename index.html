@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>West Midlands Bus Assistant</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --blue-pale: #eaf1fd;
+      --navy: #0f1d40;
+      --green: #1e8e3e;
+      --green-bg: #e6f4ea;
+      --orange: #e65100;
+      --orange-bg: #fff3e0;
+      --red: #d32f2f;
+      --grey: #757575;
+      --grey-bg: #f0f2f6;
+      --border: #e3e8f0;
+      --bg: #f4f7fc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      margin: 0;
+      background: var(--bg);
+      color: #1a1f2b;
+    }
+
+    /* ---------- top bar ---------- */
+    .topbar {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .brand-icon {
+      background: var(--blue); color: white;
+      width: 36px; height: 36px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .brand-title { font-weight: 700; font-size: 16px; color: var(--navy); }
+    .brand-sub { font-size: 11px; color: #888; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tab {
+      background: none; border: none; cursor: pointer;
+      font-size: 14px; font-weight: 600; color: #6b7587;
+      padding: 10px 14px; border-bottom: 3px solid transparent;
+    }
+    .tab:hover { color: var(--blue); }
+    .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    /* ---------- hero + search ---------- */
+    .hero {
+      background: linear-gradient(180deg, #dbe8fd 0%, #eef4fe 70%, var(--bg) 100%);
+      padding: 44px 24px 70px 24px;
+      text-align: center;
+    }
+    .hero h1 { margin: 0 0 8px 0; font-size: 34px; color: var(--navy); }
+    .hero p { margin: 0; font-size: 16px; color: #50607d; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    .search-card {
+      background: white;
+      margin-top: -46px;
+      padding: 18px;
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgba(30, 58, 138, 0.10);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .field-label { font-size: 12px; font-weight: 600; color: #6b7587; margin-bottom: 4px; }
+    .search-field { position: relative; flex: 1; min-width: 190px; }
+    .search-field input {
+      width: 100%;
+      padding: 12px 12px 12px 36px;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fafbfd;
+    }
+    .search-field input:focus { outline: none; border-color: var(--blue); background: white; }
+    .search-field .pin {
+      position: absolute; left: 11px; bottom: 12px;
+      font-size: 14px; cursor: pointer;
+    }
+    .search-results-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: white; border: 1px solid var(--border);
+      border-radius: 10px; margin-top: 4px; z-index: 60;
+      max-height: 240px; overflow-y: auto;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    }
+    .stop-option { padding: 10px 12px; cursor: pointer; font-size: 14px; }
+    .stop-option:hover { background: var(--grey-bg); }
+
+    .swap-btn {
+      border: 1px solid var(--border); background: #fafbfd;
+      width: 44px; height: 44px; border-radius: 10px;
+      font-size: 18px; cursor: pointer; color: var(--blue);
+    }
+    .swap-btn:hover { background: var(--blue-pale); }
+    .time-wrap { min-width: 170px; }
+    select.time-select {
+      width: 100%; padding: 12px; font-size: 14px;
+      border: 1px solid var(--border); border-radius: 10px; background: #fafbfd;
+    }
+    .btn-search {
+      background: var(--blue); color: white; border: none;
+      padding: 13px 24px; border-radius: 10px;
+      font-weight: 700; font-size: 14px; cursor: pointer;
+    }
+    .btn-search:hover { background: var(--blue-dark); }
+
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 0 0; }
+    .chip {
+      background: white; border: 1px solid var(--border);
+      border-radius: 20px; padding: 8px 14px;
+      font-size: 13px; font-weight: 600; color: #3b475e; cursor: pointer;
+    }
+    .chip:hover { background: var(--blue-pale); border-color: var(--blue); }
+    .chip .edit { margin-left: 8px; color: #9aa4b8; }
+
+    .mode-note { font-size: 13px; color: #6b7587; margin: 14px 0 0 0; }
+
+    /* ---------- nearby stops ---------- */
+    .section-title { font-size: 20px; font-weight: 700; color: var(--navy); margin: 28px 0 12px 0; }
+    .nearby-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .nearby-card {
+      background: white; border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px 16px; cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .nearby-card:hover { border-color: var(--blue); }
+    .nearby-top { display: flex; align-items: center; gap: 12px; }
+    .line-badge {
+      background: var(--blue); color: white; font-weight: 700;
+      min-width: 44px; text-align: center; padding: 8px 10px; border-radius: 9px; font-size: 15px;
+    }
+    .nearby-name { flex: 1; display: flex; flex-direction: column; font-size: 15px; }
+    .nearby-name span { font-size: 12px; color: #777; margin-top: 2px; }
+    .chev { color: #9aa4b8; font-size: 22px; }
+    .nearby-due { margin-top: 10px; font-size: 14px; font-weight: 600; color: var(--green); }
+    .nearby-live { margin-top: 4px; font-size: 12.5px; color: #555; min-height: 16px; }
+    .btn-locate {
+      background: white; color: var(--blue); border: 1px solid var(--blue);
+      padding: 10px 16px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 14px;
+    }
+    .btn-locate:hover { background: var(--blue-pale); }
+
+    /* ---------- generic pages ---------- */
+    .page-body { padding-bottom: 40px; }
+    .page-pad { padding-top: 28px; padding-bottom: 40px; }
+    .page-title { font-size: 24px; font-weight: 700; color: var(--navy); margin: 0 0 14px 0; }
+    .result-heading { font-size: 14px; font-weight: 600; color: #444; margin: 18px 0 12px 0; }
+    .placeholder-text { font-size: 14px; color: #888; }
+
+    .live-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    .live-chip {
+      background: white; border: 1px solid var(--border); border-radius: 14px;
+      padding: 5px 10px; font-size: 12.5px; font-weight: 600;
+    }
+
+    /* ---------- trip cards (unchanged look) ---------- */
+    .trip-card {
+      background: white; border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px; margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .trip-card.recommended { border-left: 5px solid var(--green); }
+    .trip-card.tight { border-left: 5px solid var(--orange); }
+    .trip-card.long_wait { border-left: 5px solid var(--grey); }
+    .trip-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+    .trip-duration { font-size: 26px; font-weight: 700; }
+    .trip-arrive { font-size: 13px; color: #666; }
+    .tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; font-weight: 700; padding: 4px 10px;
+      border-radius: 12px; margin-bottom: 10px;
+    }
+    .tag.recommended { background: var(--green-bg); color: var(--green); }
+    .tag.tight { background: var(--orange-bg); color: var(--orange); }
+    .tag.long_wait { background: var(--grey-bg); color: var(--grey); }
+    .trip-reason { font-size: 13px; color: #666; margin-bottom: 4px; }
+    .trip-frequency { font-size: 13px; color: #888; margin-bottom: 10px; font-style: italic; }
+    .leg-icons-row {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 10px 0; padding: 10px; background: #fafbfd; border-radius: 8px; font-size: 13px;
+    }
+    .leg-icon-chip {
+      display: flex; align-items: center; gap: 5px; background: white;
+      border: 1px solid var(--border); padding: 5px 10px; border-radius: 14px; font-weight: 600;
+    }
+    .leg-arrow { color: #aaa; font-size: 12px; }
+    .btn-detail {
+      background: white; color: var(--blue); border: 1px solid var(--blue);
+      padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 13px;
+      cursor: pointer; width: 100%; margin-top: 6px;
+    }
+    .btn-detail:hover { background: var(--blue-pale); }
+    .btn-small {
+      background: white; color: var(--blue); border: 1px solid var(--blue);
+      padding: 8px 14px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer;
+    }
+    .btn-small:hover { background: var(--blue-pale); }
+    .btn-small.danger { color: var(--red); border-color: var(--red); }
+    .btn-small.danger:hover { background: #fdecec; }
+    .back-link {
+      background: none; border: none; color: var(--blue); font-weight: 600;
+      font-size: 14px; cursor: pointer; padding: 0; margin: 18px 0 14px 0;
+    }
+
+    /* ---------- detail view (unchanged look) ---------- */
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 900px) { .detail-grid { grid-template-columns: 1fr; } }
+    .summary-card {
+      background: white; border-radius: 14px; padding: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 16px;
+    }
+    .summary-badge-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+    .big-duration { font-size: 34px; font-weight: 800; }
+    .arrive-sub { font-size: 13px; color: #666; margin-bottom: 10px; }
+    .timeline-card {
+      background: white; border-radius: 14px; padding: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .stop-list { list-style: none; padding: 0; margin: 0; }
+    .stop-list li {
+      padding: 10px 0 10px 22px; border-left: 2px solid var(--border);
+      position: relative; font-size: 13.5px;
+    }
+    .stop-list li::before {
+      content: ""; position: absolute; left: -6px; top: 14px;
+      width: 9px; height: 9px; border-radius: 50%; background: var(--blue);
+    }
+    .stop-list li.board::before, .stop-list li.alight::before {
+      background: var(--green); width: 12px; height: 12px; left: -7px;
+    }
+    .stop-list li:last-child { border-left: 2px solid transparent; }
+    .stop-list .stop-time { color: #888; margin-right: 8px; font-weight: 600; }
+    .stop-list .stop-stand { color: var(--green); font-size: 12px; display: block; margin-top: 3px; }
+    .stop-list .divider {
+      border-left: none; padding-left: 0; font-weight: 700; color: var(--orange);
+      margin: 8px 0; background: var(--orange-bg); padding: 8px 10px; border-radius: 6px;
+    }
+    .stop-list .board-note {
+      display: block; margin-top: 4px; background: var(--green-bg); color: var(--green);
+      padding: 6px 8px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    }
+    .journey-map { height: 340px; border-radius: 14px 14px 0 0; overflow: hidden; }
+    .map-card {
+      background: white; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden; margin-bottom: 16px;
+    }
+    .live-status-bar {
+      padding: 10px 14px; font-size: 12.5px; color: var(--red); border-top: 1px solid var(--border);
+    }
+    .live-status-bar.none { color: #999; }
+    .stop-info-card {
+      background: white; border-radius: 14px; padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 16px;
+    }
+    .stop-info-title { font-size: 13px; color: #888; margin-bottom: 4px; }
+    .stop-info-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .stop-info-stand { font-size: 13px; color: var(--green); font-weight: 600; }
+    .departures-card {
+      background: white; border-radius: 14px; padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .departures-card h3 { font-size: 15px; margin: 0 0 10px 0; }
+    .departure-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;
+    }
+    .departure-row:last-child { border-bottom: none; }
+    .departure-line {
+      background: var(--blue); color: white; font-weight: 700; font-size: 12px;
+      padding: 2px 8px; border-radius: 4px; margin-right: 8px;
+    }
+    .departure-dest { flex: 1; color: #444; }
+    .departure-time { color: #666; font-weight: 600; }
+    .live-bus-icon { font-size: 20px; text-align: center; line-height: 20px; }
+    .leaflet-control-zoom a {
+      width: 36px !important; height: 36px !important;
+      line-height: 36px !important; font-size: 20px !important;
+    }
+
+    /* ---------- saved trips ---------- */
+    .saved-card {
+      background: white; border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px 16px; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .saved-route { flex: 1; font-weight: 600; min-width: 200px; }
+
+    .footer {
+      border-top: 1px solid var(--border); margin-top: 20px; padding: 18px 24px;
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+      font-size: 13px; color: #6b7587;
+    }
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 26px; }
+      .topbar { padding: 10px 16px; gap: 10px; }
+      .container { padding: 0 16px; }
+    }
+        /* ---------- chat assistant ---------- */
+    .chat-fab {
+      position: fixed; right: 20px; bottom: 20px; z-index: 200;
+      background: var(--blue); color: white; border: none; border-radius: 28px;
+      padding: 12px 18px; font-weight: 700; font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+    }
+    .chat-fab:hover { background: var(--blue-dark); }
+    .chat-panel {
+      position: fixed; right: 20px; bottom: 80px; z-index: 200;
+      width: 350px; max-width: calc(100vw - 32px); height: 460px;
+      background: white; border: 1px solid var(--border); border-radius: 16px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+      flex-direction: column; overflow: hidden;
+    }
+    .chat-head {
+      background: var(--blue); color: white; padding: 12px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-weight: 700; font-size: 14px;
+    }
+    .chat-head span { display: flex; gap: 8px; align-items: center; }
+    .chat-head button { background: none; border: none; color: white; font-size: 16px; cursor: pointer; }
+    .chat-msgs {
+      flex: 1; overflow-y: auto; padding: 12px; background: #f7f9fd;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .msg { max-width: 85%; padding: 9px 12px; border-radius: 12px; font-size: 13.5px; line-height: 1.4; white-space: pre-wrap; }
+    .msg.bot { background: white; border: 1px solid var(--border); align-self: flex-start; }
+    .msg.me { background: var(--blue); color: white; align-self: flex-end; }
+    .chat-suggest { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 12px 0 12px; background: #f7f9fd; }
+    .chat-suggest button {
+      background: white; border: 1px solid var(--border); border-radius: 14px;
+      padding: 5px 10px; font-size: 12px; cursor: pointer; color: #3b475e;
+    }
+    .chat-suggest button:hover { background: var(--blue-pale); }
+    .chat-input { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); background: white; }
+    .chat-input input {
+      flex: 1; padding: 10px 12px; font-size: 14px;
+      border: 1px solid var(--border); border-radius: 10px;
+    }
+    .chat-input input:focus { outline: none; border-color: var(--blue); }
+    .chat-input button {
+      background: var(--blue); color: white; border: none; border-radius: 10px;
+      padding: 0 16px; font-weight: 700; cursor: pointer;
+    }
+        /* ---------- compact trip cards (Google-Maps style) ---------- */
+    .trip-card.compact { padding: 14px 16px; cursor: pointer; }
+    .trip-card.compact:hover { border-color: var(--blue); }
+    .compact-top { display: flex; justify-content: space-between; align-items: baseline; }
+    .compact-times { font-size: 18px; font-weight: 700; }
+    .compact-dur { font-size: 18px; font-weight: 700; }
+    .compact-chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 8px 0; font-size: 15px; }
+    .leg-sep { color: #9aa4b8; }
+    .line-pill {
+      background: #d93025; color: white; font-weight: 700; font-size: 13px;
+      padding: 3px 9px; border-radius: 6px;
+    }
+    .compact-meta { font-size: 13.5px; color: #555; }
+    .compact-sub { font-size: 13px; color: #777; margin-top: 3px; }
+    .compact-reason { font-size: 12.5px; color: var(--orange); margin-top: 4px; }
+    .compact-details { background: none; border: none; color: #1a7f8e; font-weight: 600; font-size: 14px; padding: 8px 0 0 0; cursor: pointer; 
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand" onclick="showPage('plan')">
+      <div class="brand-icon">🚌</div>
+      <div>
+        <div class="brand-title">West Midlands Bus Assistant</div>
+        <div class="brand-sub">Real timetables &amp; live bus tracking</div>
+      </div>
+    </div>
+    <nav class="tabs">
+      <button class="tab active" id="tab-plan" onclick="showPage('plan')">🧭 Plan Journey</button>
+      <button class="tab" id="tab-departures" onclick="showPage('departures')">🕐 Live Departures</button>
+      <button class="tab" id="tab-saved" onclick="showPage('saved')">⭐ Saved Trips</button>
+    </nav>
+  </header>
+
+  <!-- ================= PAGE: PLAN JOURNEY ================= -->
+  <div id="page-plan">
+    <div class="hero">
+      <h1>Plan your bus journey across the West Midlands</h1>
+      <p>Real timetables and live bus positions.</p>
+    </div>
+
+    <div class="container">
+      <div class="search-card">
+        <div class="search-field">
+          <div class="field-label">From</div>
+          <span class="pin" onclick="useMyLocation()" title="Use my current location">📍</span>
+          <input type="text" id="fromBox" placeholder="Stop name or place" autocomplete="off">
+          <div id="fromResults" class="search-results-dropdown" style="display:none;"></div>
+        </div>
+        <button class="swap-btn" onclick="swapStops()" title="Swap From and To">⇄</button>
+        <div class="search-field">
+          <div class="field-label">To</div>
+          <span class="pin">🎯</span>
+          <input type="text" id="toBox" placeholder="Stop name or place" autocomplete="off">
+          <div id="toResults" class="search-results-dropdown" style="display:none;"></div>
+        </div>
+        <div class="time-wrap">
+          <div class="field-label">When</div>
+          <select id="timeFilter" class="time-select">
+            <option value="0">Leave now</option>
+            <option value="15">Leave in 15 min</option>
+            <option value="30">Leave in 30 min</option>
+            <option value="at:07:00">Leave at 7:00 AM</option>
+            <option value="at:08:00">Leave at 8:00 AM</option>
+            <option value="at:09:00">Leave at 9:00 AM</option>
+            <option value="at:12:00">Leave at 12:00 PM</option>
+            <option value="at:17:00">Leave at 5:00 PM</option>
+          </select>
+        </div>
+        <button class="btn-search" onclick="planTrip()">🔍 Find buses</button>
+      </div>
+
+      <div class="chips" id="chipsRow"></div>
+      <div class="mode-note">🚌 Bus routes only for now — trains and trams coming soon.</div>
+
+      <div id="nearbySection">
+        <div class="section-title">Nearby stops</div>
+        <div id="nearbyList">
+          <button class="btn-locate" onclick="askForNearby(false)">📍 Show stops near me</button>
+        </div>
+      </div>
+
+      <div class="page-body">
+        <div id="listView">
+          <div id="tripResults"></div>
+        </div>
+
+        <div id="detailView" style="display:none;">
+          <button class="back-link" onclick="showResultsList()">&larr; Back to results</button>
+          <div class="detail-grid">
+            <div class="detail-left">
+              <div class="summary-card" id="summaryCard"></div>
+              <div class="timeline-card">
+                <ul class="stop-list" id="stopListEl"></ul>
+              </div>
+            </div>
+            <div class="detail-right">
+              <div class="map-card">
+                <div class="journey-map" id="journeyMap"></div>
+                <div class="live-status-bar" id="liveStatusBar">Checking for a live bus...</div>
+              </div>
+              <div class="stop-info-card" id="stopInfoCard"></div>
+              <div class="departures-card" id="departuresCard">
+                <h3>Departures from this stop</h3>
+                <div id="departuresList" class="placeholder-text">Loading...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PAGE: LIVE DEPARTURES ================= -->
+  <div id="page-departures" style="display:none;">
+    <div class="container page-pad">
+      <h2 class="page-title">Live Departures</h2>
+      <div class="search-card" style="margin-top:0;">
+        <div class="search-field">
+          <div class="field-label">Stop</div>
+          <span class="pin">🚏</span>
+          <input type="text" id="depBox" placeholder="Type a stop name" autocomplete="off">
+          <div id="depResults" class="search-results-dropdown" style="display:none;"></div>
+        </div>
+        <button class="btn-search" onclick="loadDepartures()">↻ Refresh</button>
+      </div>
+      <div class="departures-card" style="margin-top:16px;">
+        <div id="depList" class="placeholder-text">Pick a stop above to see the next buses.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PAGE: SAVED TRIPS ================= -->
+  <div id="page-saved" style="display:none;">
+    <div class="container page-pad">
+      <h2 class="page-title">Saved Trips</h2>
+      <div id="savedList"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Bus routes only for now — trains and trams coming soon.</span>
+    <span>Map data © OpenStreetMap contributors</span>
+  </div>
+    <!-- the bus-in-a-speech-bubble icon (drawn here, reused below) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="bus-bubble" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 4h22a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H14l-6 5v-5H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>
+        <rect x="9" y="8" width="14" height="10" rx="2"/>
+        <path d="M9 12.5h14"/>
+      </g>
+      <circle cx="12.5" cy="18.5" r="1.3" fill="currentColor"/>
+      <circle cx="19.5" cy="18.5" r="1.3" fill="currentColor"/>
+    </symbol>
+  </svg>
+
+  <button class="chat-fab" id="chatFab" onclick="toggleChat()">
+    <svg width="22" height="22"><use href="#bus-bubble"/></svg>
+    <span>Ask</span>
+  </button>
+
+  <div class="chat-panel" id="chatPanel" style="display:none;">
+    <div class="chat-head">
+      <span><svg width="20" height="20"><use href="#bus-bubble"/></svg> Ask the bus assistant</span>
+      <button onclick="toggleChat()" aria-label="Close">✕</button>
+    </div>
+    <div class="chat-msgs" id="chatMsgs"></div>
+    <div class="chat-suggest" id="chatSuggest">
+      <button data-q="Next bus to Selly Oak">Next bus to Selly Oak</button>
+      <button data-q="Buses at Bibsworth Avenue">Buses at Bibsworth Avenue</button>
+      <button data-q="Is the 6 late?">Is the 6 late?</button>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="chatInput" placeholder="Ask about a bus..." autocomplete="off">
+      <button onclick="sendChat()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    // When we publish the app, this is the only line that changes.
+    const API = (location.hostname === "127.0.0.1" || location.hostname === "localhost") ? "http://127.0.0.1:8010" : location.origin;
+
+    let selectedFromStop = null;
+    let selectedToStop = null;
+    let currentMap = null;
+    let currentLiveInterval = null;
+    let currentLiveMarkers = {};
+    let currentDepStop = null;
+    let resultsShown = false;
+
+    // ---------- small helpers ----------
+    function escapeHtml(s) {
+      return String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, c => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+      ));
+    }
+    function loadJSON(key, fallback) {
+      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+      catch (e) { return fallback; }
+    }
+    function saveJSON(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* storage blocked */ }
+    }
+    function dueText(m) { return m <= 0 ? "Due now" : `Due in ${m} min`; }
+
+    function minutesUntilLondonTime(hhmm) {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hour12: false
+      }).formatToParts(new Date());
+      const h = parseInt(parts.find(p => p.type === "hour").value, 10) % 24;
+      const m = parseInt(parts.find(p => p.type === "minute").value, 10);
+      const [th, tm] = hhmm.split(":").map(Number);
+      let diff = (th * 60 + tm) - (h * 60 + m);
+      if (diff < 0) diff += 24 * 60;
+      return diff;
+    }
+    function formatTime(t) {
+      if (!t) return t;
+      const parts = String(t).split(":");
+      let h = parseInt(parts[0], 10) % 24;
+      const m = parts[1];
+      const suffix = h >= 12 ? "PM" : "AM";
+      h = h % 12;
+      if (h === 0) h = 12;
+      return `${h}:${m} ${suffix}`;
+    }
+    function dedupe(trips, keyFn) {
+      const seen = new Set();
+      const unique = [];
+      trips.forEach(t => {
+        const key = keyFn(t);
+        if (!seen.has(key)) { seen.add(key); unique.push(t); }
+      });
+      return unique;
+    }
+    function timeToMinutes(t) {
+      const parts = t.split(":").map(Number);
+      return parts[0] * 60 + parts[1] + (parts[2] || 0) / 60;
+    }
+    function diffMinutes(a, b) { return Math.round(timeToMinutes(b) - timeToMinutes(a)); }
+
+    // ---------- page switching ----------
+    function showPage(name) {
+      ["plan", "departures", "saved"].forEach(p => {
+        document.getElementById("page-" + p).style.display = (p === name) ? "block" : "none";
+        document.getElementById("tab-" + p).classList.toggle("active", p === name);
+      });
+      if (name !== "plan" && currentLiveInterval) {
+        clearInterval(currentLiveInterval);
+        currentLiveInterval = null;
+      }
+      if (name === "plan") { renderChips(); updateNearbyVisibility(); }
+      if (name === "saved") renderSaved();
+      window.scrollTo(0, 0);
+    }
+    function updateNearbyVisibility() {
+      document.getElementById("nearbySection").style.display = resultsShown ? "none" : "block";
+    }
+
+    // ---------- stop search box (used by From, To and Live Departures) ----------
+    function attachStopSearch(inputId, resultsId, onPick, onType) {
+      const input = document.getElementById(inputId);
+      const div = document.getElementById(resultsId);
+      let timer = null;
+      input.addEventListener("input", () => {
+        if (onType) onType();
+        clearTimeout(timer);
+        // wait until the person stops typing (keeps OpenStreetMap happy)
+        timer = setTimeout(async () => {
+          const q = input.value.trim();
+          if (!q) { div.style.display = "none"; return; }
+          try {
+            const response = await fetch(`${API}/stops/search?q=${encodeURIComponent(q)}`);
+            const stops = await response.json();
+            div.innerHTML = "";
+            if (!Array.isArray(stops) || stops.length === 0) { div.style.display = "none"; return; }
+            stops.forEach(stop => {
+              const item = document.createElement("div");
+              item.className = "stop-option";
+              item.textContent = stop.label ? `📍 ${stop.label}` : (stop.locality ? `${stop.stop_name} — ${stop.locality}` : stop.stop_name);
+              item.onclick = () => {
+                input.value = stop.stop_name;
+                div.style.display = "none";
+                onPick(stop);
+              };
+              div.appendChild(item);
+            });
+            div.style.display = "block";
+          } catch (e) { div.style.display = "none"; }
+        }, 450);
+      });
+    }
+    attachStopSearch("fromBox", "fromResults", s => { selectedFromStop = s.stop_name; }, () => { selectedFromStop = null; });
+    attachStopSearch("toBox", "toResults", s => { selectedToStop = s.stop_name; }, () => { selectedToStop = null; });
+    attachStopSearch("depBox", "depResults", s => openDepartures(s.stop_id, s.stop_name), null);
+
+    document.addEventListener("click", e => {
+      if (!e.target.closest(".search-field")) {
+        document.querySelectorAll(".search-results-dropdown").forEach(d => d.style.display = "none");
+      }
+    });
+
+    function swapStops() {
+      const fromBox = document.getElementById("fromBox");
+      const toBox = document.getElementById("toBox");
+      const tmpText = fromBox.value;
+      fromBox.value = toBox.value;
+      toBox.value = tmpText;
+      const tmpStop = selectedFromStop;
+      selectedFromStop = selectedToStop;
+      selectedToStop = tmpStop;
+    }
+
+    // ---------- Home / Work / Recent chips (saved in this browser only) ----------
+    function renderChips() {
+      const row = document.getElementById("chipsRow");
+      const home = loadJSON("wmba_home", null);
+      const work = loadJSON("wmba_work", null);
+      const recent = loadJSON("wmba_recent", null);
+      let html = "";
+      html += `<button class="chip" data-act="use" data-kind="home">🏠 ${home ? "Home: " + escapeHtml(home) : "Set Home"}${home ? '<span class="edit" data-act="edit" data-kind="home">✎</span>' : ""}</button>`;
+      html += `<button class="chip" data-act="use" data-kind="work">💼 ${work ? "Work: " + escapeHtml(work) : "Set Work"}${work ? '<span class="edit" data-act="edit" data-kind="work">✎</span>' : ""}</button>`;
+      if (recent && recent.from && recent.to) {
+        html += `<button class="chip" data-act="recent">🕐 Recent: ${escapeHtml(recent.from)} → ${escapeHtml(recent.to)}</button>`;
+      }
+      row.innerHTML = html;
+    }
+    document.getElementById("chipsRow").addEventListener("click", e => {
+      const el = e.target.closest("[data-act]");
+      if (!el) return;
+      const act = el.dataset.act;
+      const kind = el.dataset.kind;
+      if (act === "edit") { e.stopPropagation(); editQuick(kind); }
+      else if (act === "use") { useQuick(kind); }
+      else if (act === "recent") {
+        const r = loadJSON("wmba_recent", null);
+        if (r) { setFrom(r.from); setTo(r.to); }
+      }
+    });
+    function setFrom(name) { selectedFromStop = name; document.getElementById("fromBox").value = name; }
+    function setTo(name) { selectedToStop = name; document.getElementById("toBox").value = name; }
+    function useQuick(kind) {
+      const saved = loadJSON("wmba_" + kind, null);
+      if (saved) setTo(saved); else editQuick(kind);
+    }
+    async function editQuick(kind) {
+      const name = prompt(`Type a stop name for ${kind} (for example: Clarence Road)`);
+      if (!name) return;
+      try {
+        const response = await fetch(`${API}/stops/search?q=${encodeURIComponent(name.trim())}`);
+        const stops = await response.json();
+        if (!Array.isArray(stops) || stops.length === 0) { alert("I couldn't find a stop with that name."); return; }
+        saveJSON("wmba_" + kind, stops[0].stop_name);
+        renderChips();
+        setTo(stops[0].stop_name);
+      } catch (e) { alert("Couldn't reach the server."); }
+    }
+
+    // ---------- nearby stops ----------
+    async function showLineStatus(line, el) {
+      try {
+        const response = await fetch(`${API}/live_delay?line=${encodeURIComponent(line)}`);
+        const data = await response.json();
+        const buses = data.buses || [];
+        const known = buses.find(b => b.delay_minutes !== null);
+        if (known) {
+          const dot = known.status === "late" ? "🟠" : known.status === "early" ? "🔵" : "🟢";
+          el.textContent = `Live on route ${line}: ${dot} ${known.label}`;
+        } else if (buses.length > 0) {
+          el.textContent = `Live on route ${line}: ${buses.length} bus${buses.length > 1 ? "es" : ""} tracked`;
+        }
+      } catch (e) { /* no live info */ }
+    }
+
+    async function loadNearby(lat, lon) {
+      const list = document.getElementById("nearbyList");
+      list.innerHTML = "<p class='placeholder-text'>Finding stops near you...</p>";
+      try {
+        const response = await fetch(`${API}/stops/nearby?lat=${lat}&lon=${lon}`);
+        const stops = await response.json();
+        if (!Array.isArray(stops) || stops.length === 0) {
+          list.innerHTML = "<p class='placeholder-text'>No stops with upcoming buses found near you right now.</p>";
+          return;
+        }
+        const grid = document.createElement("div");
+        grid.className = "nearby-grid";
+        stops.forEach(s => {
+          const card = document.createElement("div");
+          card.className = "nearby-card";
+          card.innerHTML = `
+            <div class="nearby-top">
+              <span class="line-badge">${escapeHtml(s.line_name)}</span>
+              <div class="nearby-name">
+                <strong>${escapeHtml(s.stop_name)}</strong>
+                <span>${s.locality ? escapeHtml(s.locality) + " · " : ""}${s.distance_m !== null ? s.distance_m + " m away" : ""}</span>
+              </div>
+              <span class="chev">›</span>
+            </div>
+            <div class="nearby-due">🕐 ${dueText(s.due_minutes)} · ${formatTime(s.departure_time)}</div>
+            <div class="nearby-live"></div>
+          `;
+          card.onclick = () => openDepartures(s.stop_id, s.stop_name);
+          grid.appendChild(card);
+          showLineStatus(s.line_name, card.querySelector(".nearby-live"));
+        });
+        list.innerHTML = "";
+        list.appendChild(grid);
+      } catch (e) {
+        list.innerHTML = "<p class='placeholder-text'>Couldn't load nearby stops. Is the server running?</p>";
+      }
+    }
+
+    function askForNearby(fillFrom) {
+      if (!navigator.geolocation) { alert("Your browser doesn't support location."); return; }
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        loadNearby(lat, lon);
+        if (fillFrom) {
+          try {
+            const response = await fetch(`${API}/stops/nearest?lat=${lat}&lon=${lon}`);
+            const nearest = await response.json();
+            if (nearest.message) { alert(nearest.message); return; }
+            setFrom(nearest.stop_name);
+          } catch (e) { /* ignore */ }
+        }
+      }, () => {
+        alert("Couldn't get your location. Check your browser's location permission.");
+      });
+    }
+    function useMyLocation() { askForNearby(true); }
+
+    // if location is already allowed, show nearby stops straight away
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: "geolocation" }).then(p => {
+        if (p.state === "granted") askForNearby(false);
+      }).catch(() => {});
+    }
+
+    // ---------- live departures page ----------
+    function openDepartures(stopId, stopName) {
+      currentDepStop = { id: stopId, name: stopName };
+      showPage("departures");
+      document.getElementById("depBox").value = stopName;
+      loadDepartures();
+    }
+
+    async function loadDepartures() {
+      const box = document.getElementById("depList");
+      if (!currentDepStop) {
+        box.innerHTML = "Pick a stop above to see the next buses.";
+        return;
+      }
+      box.innerHTML = "Loading...";
+      try {
+        const response = await fetch(`${API}/stops/${encodeURIComponent(currentDepStop.id)}/arrivals`);
+        const data = await response.json();
+        let html = `<h3>${escapeHtml(currentDepStop.name)}</h3>`;
+        if (data.stand_where) html += `<div class="stop-info-stand">📍 Stand: ${escapeHtml(data.stand_where)}</div>`;
+        if (!data.arrivals || data.arrivals.length === 0) {
+          html += `<p class="placeholder-text">${escapeHtml(data.message || "No more scheduled departures found for this stop right now.")}</p>`;
+          box.innerHTML = html;
+          return;
+        }
+        html += `<div class="live-chips" id="depLive"></div>`;
+        html += data.arrivals.map(a => `
+          <div class="departure-row">
+            <span class="departure-line">${escapeHtml(a.line_name)}</span>
+            <span class="departure-dest">${escapeHtml(a.operator)}</span>
+            <span class="departure-time">${formatTime(a.departure_time)} · in ${minutesUntilLondonTime(a.departure_time)} min</span>
+          </div>
+        `).join("");
+        box.innerHTML = html;
+
+        const liveBox = document.getElementById("depLive");
+        const lines = [...new Set(data.arrivals.map(a => a.line_name))];
+        for (const line of lines) {
+          try {
+            const r = await fetch(`${API}/live_delay?line=${encodeURIComponent(line)}`);
+            const d = await r.json();
+            const buses = d.buses || [];
+            if (buses.length === 0) continue;
+            const known = buses.find(b => b.delay_minutes !== null);
+            const chip = document.createElement("span");
+            chip.className = "live-chip";
+            if (known) {
+              const dot = known.status === "late" ? "🟠" : known.status === "early" ? "🔵" : "🟢";
+              chip.textContent = `🔴 Route ${line} live: ${dot} ${known.label}`;
+            } else {
+              chip.textContent = `🔴 Route ${line} live: ${buses.length} bus${buses.length > 1 ? "es" : ""} tracked`;
+            }
+            liveBox.appendChild(chip);
+          } catch (e) { /* skip */ }
+        }
+      } catch (e) {
+        box.innerHTML = "<p class='placeholder-text'>Couldn't load departures. Is the server running?</p>";
+      }
+    }
+
+    // ---------- saved trips ----------
+    function saveCurrentTrip() {
+      if (!selectedFromStop || !selectedToStop) return;
+      const list = loadJSON("wmba_saved", []);
+      const exists = list.some(t => t.from === selectedFromStop && t.to === selectedToStop);
+      if (!exists) list.push({ from: selectedFromStop, to: selectedToStop });
+      saveJSON("wmba_saved", list);
+      const btn = document.getElementById("saveBtn");
+      if (btn) btn.textContent = "✓ Saved";
+    }
+    function renderSaved() {
+      const box = document.getElementById("savedList");
+      const list = loadJSON("wmba_saved", []);
+      if (list.length === 0) {
+        box.innerHTML = "<p class='placeholder-text'>No saved trips yet. Open a trip's details and tap “☆ Save this trip”.</p>";
+        return;
+      }
+      box.innerHTML = "";
+      list.forEach((t, i) => {
+        const card = document.createElement("div");
+        card.className = "saved-card";
+        card.innerHTML = `
+          <div class="saved-route">${escapeHtml(t.from)} → ${escapeHtml(t.to)}</div>
+          <button class="btn-small" data-i="${i}" data-act="go">Search</button>
+          <button class="btn-small danger" data-i="${i}" data-act="remove">Remove</button>
+        `;
+        box.appendChild(card);
+      });
+    }
+    document.getElementById("savedList").addEventListener("click", e => {
+      const el = e.target.closest("[data-act]");
+      if (!el) return;
+      const i = parseInt(el.dataset.i, 10);
+      const list = loadJSON("wmba_saved", []);
+      if (el.dataset.act === "remove") {
+        list.splice(i, 1);
+        saveJSON("wmba_saved", list);
+        renderSaved();
+      } else if (el.dataset.act === "go" && list[i]) {
+        showPage("plan");
+        setFrom(list[i].from);
+        setTo(list[i].to);
+        planTrip();
+      }
+    });
+
+    // ---------- trip search and cards ----------
+    function getTripLines(trip) {
+      if (trip.line_name) return [trip.line_name];
+      if (trip.line1) return [trip.line1, trip.line2];
+      return [];
+    }
+
+    function buildLegIconsRow(t) {
+      if (t.line_name) {
+        return `<div class="leg-icon-chip">🚌 ${t.line_name} · ${t.duration_minutes} min</div>`;
+      }
+      const d1 = diffMinutes(t.depart1, t.arrive1);
+      const d2 = diffMinutes(t.depart2, t.arrive2);
+      let html = `<div class="leg-icon-chip">🚌 ${t.line1} · ${d1} min</div>`;
+      html += `<span class="leg-arrow">→</span>`;
+      if (t.walk_meters !== null && t.walk_meters !== undefined) {
+        html += `<div class="leg-icon-chip" title="${t.walk_meters} m">🚶 ${Math.max(1, Math.round(t.walk_meters / 84))} min</div>`;
+        html += `<span class="leg-arrow">→</span>`;
+      }
+      html += `<div class="leg-icon-chip">🚌 ${t.line2} · ${d2} min</div>`;
+      return html;
+    }
+
+    function buildDirectCard(t) {
+      const card = document.createElement("div");
+      card.className = `trip-card ${t.status}`;
+      card.innerHTML = `
+        <div class="trip-header">
+          <div class="trip-duration">${t.duration_minutes} min</div>
+          <div class="trip-arrive">Arrive ${formatTime(t.arrive_time)}</div>
+        </div>
+        <span class="tag ${t.status}">${t.status_label}</span>
+        <div class="trip-reason">${t.reason}</div>
+        <div class="trip-frequency">${t.frequency}</div>
+        <div class="leg-icons-row">${buildLegIconsRow(t)}</div>
+      `;
+      const btn = document.createElement("button");
+      btn.className = "btn-detail";
+      btn.textContent = "View journey details →";
+      btn.onclick = () => openDetailView(t);
+      card.appendChild(btn);
+      return card;
+    }
+
+    function buildTransferCard(t) {
+      const card = document.createElement("div");
+      card.className = `trip-card ${t.status}`;
+      card.innerHTML = `
+        <div class="trip-header">
+          <div class="trip-duration">${t.duration_minutes} min</div>
+          <div class="trip-arrive">Arrive ${formatTime(t.arrive2)}</div>
+        </div>
+        <span class="tag ${t.status}">${t.status_label}</span>
+        <div class="trip-reason">${t.reason}</div>
+        <div class="trip-frequency">${t.frequency}</div>
+        <div class="leg-icons-row">${buildLegIconsRow(t)}</div>
+      `;
+      const btn = document.createElement("button");
+      btn.className = "btn-detail";
+      btn.textContent = "View journey details →";
+      btn.onclick = () => openDetailView(t);
+      card.appendChild(btn);
+      return card;
+    }
+
+    async function planTrip() {
+      const resultsDiv = document.getElementById("tripResults");
+      document.getElementById("listView").style.display = "block";
+      document.getElementById("detailView").style.display = "none";
+      resultsShown = true;
+      updateNearbyVisibility();
+
+      if (!selectedFromStop || !selectedToStop) {
+        resultsDiv.innerHTML = "<p class='placeholder-text'>Please pick a stop from the dropdown list for both From and To.</p>";
+        return;
+      }
+      saveJSON("wmba_recent", { from: selectedFromStop, to: selectedToStop });
+
+      const timeChoice = document.getElementById("timeFilter").value;
+      const afterMinutes = timeChoice.startsWith("at:") ? minutesUntilLondonTime(timeChoice.slice(3)) : timeChoice;
+      resultsDiv.innerHTML = "<p class='placeholder-text'>Searching...</p>";
+
+      try {
+        const directResponse = await fetch(`${API}/trip?from_stop=${encodeURIComponent(selectedFromStop)}&to_stop=${encodeURIComponent(selectedToStop)}&after_minutes=${afterMinutes}`);
+        const directTrips = await directResponse.json();
+
+        if (!directTrips.message) {
+          const uniqueTrips = dedupe(directTrips, t => `${t.line_name}-${t.depart_time}-${t.arrive_time}`);
+          resultsDiv.innerHTML = "<div class='result-heading'>Direct buses found:</div>";
+          uniqueTrips.forEach(t => resultsDiv.appendChild(buildDirectCard(t)));
+          return;
+        }
+
+        const transferResponse = await fetch(`${API}/trip_transfer?from_stop=${encodeURIComponent(selectedFromStop)}&to_stop=${encodeURIComponent(selectedToStop)}&after_minutes=${afterMinutes}`);
+        const transferTrips = await transferResponse.json();
+
+        if (transferTrips.message) {
+          resultsDiv.innerHTML = `<p class="placeholder-text">${transferTrips.message}</p>`;
+          return;
+        }
+
+        const uniqueTransfers = dedupe(transferTrips, t => `${t.line1}-${t.depart1}-${t.line2}-${t.depart2}`);
+        resultsDiv.innerHTML = "<div class='result-heading'>No direct bus — but here's a route with one change:</div>";
+        uniqueTransfers.forEach(t => resultsDiv.appendChild(buildTransferCard(t)));
+      } catch (e) {
+        resultsDiv.innerHTML = "<p class='placeholder-text'>Couldn't reach the server. Is it running?</p>";
+      }
+    }
+
+    function showResultsList() {
+      if (currentLiveInterval) clearInterval(currentLiveInterval);
+      document.getElementById("detailView").style.display = "none";
+      document.getElementById("listView").style.display = "block";
+    }
+
+    async function getRoadRoute(coords) {
+      // coords is a list of [lat, lon] pairs. OSRM wants them as "lon,lat;lon,lat;..."
+      const coordString = coords.map(c => `${c[1]},${c[0]}`).join(";");
+      const url = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson`;
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.routes && data.routes.length > 0) {
+          // OSRM gives back [lon, lat] pairs — Leaflet wants [lat, lon], so flip them
+          return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        }
+      } catch (e) {
+        // OSRM didn't respond — we'll fall back to the straight line
+      }
+      return null;
+    }
+
+    async function pollLiveBuses(lines, map, liveMarkers, statusDiv) {
+      const parts = [];
+      for (const line of lines) {
+        try {
+          const response = await fetch(`${API}/live_delay?line=${encodeURIComponent(line)}`);
+          const data = await response.json();
+
+          if (liveMarkers[line]) {
+            map.removeLayer(liveMarkers[line]);
+            delete liveMarkers[line];
+          }
+
+          if (data.buses && data.buses.length > 0) {
+            // prefer a bus whose delay we could work out; otherwise just show the first one
+            const bus = data.buses.find(b => b.delay_minutes !== null) || data.buses[0];
+            const icon = L.divIcon({ className: "live-bus-icon", html: "🚌", iconSize: [24, 24] });
+            const marker = L.marker([bus.latitude, bus.longitude], { icon: icon })
+              .addTo(map)
+              .bindPopup(`Live bus — Route ${line}<br>${bus.label}`);
+            liveMarkers[line] = marker;
+            const dot = bus.status === "late" ? "🟠" : bus.status === "early" ? "🔵" : bus.status === "on_time" ? "🟢" : "⚪";
+            parts.push(`${dot} ${line}: ${bus.label}`);
+          }
+        } catch (e) { /* skip this round */ }
+      }
+
+      if (parts.length > 0) {
+        statusDiv.textContent = `🔴 Live — ${parts.join("  ·  ")} (estimated from the bus's position)`;
+        statusDiv.className = "live-status-bar";
+      } else {
+        statusDiv.textContent = "No live bus currently reporting position for this route (may be off-hours).";
+        statusDiv.className = "live-status-bar none";
+      }
+    }
+
+    async function openDetailView(trip) {
+      document.getElementById("listView").style.display = "none";
+      document.getElementById("detailView").style.display = "block";
+
+      const isDirect = !!trip.line_name;
+      const arriveTime = isDirect ? trip.arrive_time : trip.arrive2;
+
+      document.getElementById("summaryCard").innerHTML = `
+        <div class="summary-badge-row">
+          <span class="tag ${trip.status}">${trip.status === "recommended" ? "✅" : (trip.status === "tight" ? "⚠️" : "🕐")} ${trip.status_label}</span>
+          <button class="btn-small" id="saveBtn" onclick="saveCurrentTrip()">☆ Save this trip</button>
+        </div>
+        <div class="big-duration">${trip.duration_minutes} min</div>
+        <div class="arrive-sub">Arrive ${formatTime(arriveTime)}</div>
+        <div class="leg-icons-row">${buildLegIconsRow(trip)}</div>
+        <div class="trip-reason">${trip.reason}</div>
+        <div class="trip-frequency">${trip.frequency}</div>
+      `;
+
+      let allStops = [];
+      for (let i = 0; i < trip.legs.length; i++) {
+        const leg = trip.legs[i];
+        const response = await fetch(`${API}/journey_detail?journey_id=${encodeURIComponent(leg.journey_id)}&from_stop_id=${encodeURIComponent(leg.from_stop_id)}&to_stop_id=${encodeURIComponent(leg.to_stop_id)}`);
+        const data = await response.json();
+        if (data.message) continue;
+        if (i > 0) allStops.push({ divider: true });
+        data.stops.forEach((s, idx) => {
+          allStops.push({
+            ...s,
+            isBoard: idx === 0,
+            isAlight: idx === data.stops.length - 1,
+            stopCount: data.stop_count
+          });
+        });
+      }
+
+      const listHtml = allStops.map(s => {
+        if (s.divider) return `<li class="divider">🔄 Change buses here</li>`;
+        const cls = s.isBoard ? "board" : (s.isAlight ? "alight" : "");
+        const localityText = s.locality ? ` — ${s.locality}` : "";
+        let extra = "";
+        if (s.isBoard && s.stand_where) {
+          extra += `<span class="stop-stand">📍 Stand: ${s.stand_where}</span>`;
+          extra += `<span class="board-note">Board here · ${s.stopCount} stops on this bus</span>`;
+        }
+        if (s.isAlight) {
+          extra += `<span class="board-note">Get off here</span>`;
+        }
+        return `<li class="${cls}"><span class="stop-time">${formatTime(s.scheduled_time)}</span><strong>${s.stop_name}</strong>${localityText}${extra}</li>`;
+      }).join("");
+
+      document.getElementById("stopListEl").innerHTML = listHtml;
+
+      if (currentMap) {
+        currentMap.remove();
+        currentMap = null;
+      }
+      if (currentLiveInterval) clearInterval(currentLiveInterval);
+      currentLiveMarkers = {};
+
+      const coords = allStops.filter(s => !s.divider && s.latitude && s.longitude).map(s => [s.latitude, s.longitude]);
+      const statusDiv = document.getElementById("liveStatusBar");
+
+      if (coords.length > 0 && window.L) {
+        currentMap = L.map("journeyMap", {
+          zoomControl: true,
+          dragging: true,
+          doubleClickZoom: true,
+          touchZoom: true,
+          scrollWheelZoom: false
+        });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(currentMap);
+        const roadCoords = await getRoadRoute(coords);
+        L.polyline(roadCoords || coords, { color: '#2563eb', weight: 4 }).addTo(currentMap);
+        coords.forEach((c, i) => {
+          const isEnd = i === 0 || i === coords.length - 1;
+          L.circleMarker(c, {
+            radius: isEnd ? 7 : 4,
+            color: isEnd ? '#1e8e3e' : '#2563eb',
+            fillColor: isEnd ? '#1e8e3e' : '#2563eb',
+            fillOpacity: 1
+          }).addTo(currentMap);
+        });
+        currentMap.fitBounds(coords, { padding: [30, 30] });
+        setTimeout(() => currentMap.invalidateSize(), 50);
+
+        const lines = getTripLines(trip);
+        pollLiveBuses(lines, currentMap, currentLiveMarkers, statusDiv);
+        currentLiveInterval = setInterval(() => {
+          pollLiveBuses(lines, currentMap, currentLiveMarkers, statusDiv);
+        }, 20000);
+      }
+
+      const boardStopId = trip.legs[0].from_stop_id;
+      const boardStopName = allStops.find(s => !s.divider)?.stop_name || "";
+
+      const arrivalsResp = await fetch(`${API}/stops/${encodeURIComponent(boardStopId)}/arrivals`);
+      const arrivalsData = await arrivalsResp.json();
+
+      document.getElementById("stopInfoCard").innerHTML = `
+        <div class="stop-info-title">Boarding stop</div>
+        <div class="stop-info-name">${boardStopName}</div>
+        ${arrivalsData.stand_where ? `<div class="stop-info-stand">📍 Stand: ${arrivalsData.stand_where}</div>` : ""}
+      `;
+
+      const departuresListEl = document.getElementById("departuresList");
+      if (arrivalsData.arrivals && arrivalsData.arrivals.length > 0) {
+        departuresListEl.innerHTML = arrivalsData.arrivals.slice(0, 6).map(a => `
+          <div class="departure-row">
+            <span class="departure-line">${a.line_name}</span>
+            <span class="departure-dest">${a.operator}</span>
+            <span class="departure-time">${formatTime(a.departure_time)}</span>
+          </div>
+        `).join("");
+      } else {
+        departuresListEl.innerHTML = `<p class="placeholder-text">No more scheduled departures found for this stop right now.</p>`;
+      }
+    }
+
+        // ---------- chat assistant ----------
+    let userPos = null;
+    function getPos(allowPrompt) {
+      return new Promise(resolve => {
+        if (userPos) return resolve(userPos);
+        if (!navigator.geolocation) return resolve(null);
+        const go = () => navigator.geolocation.getCurrentPosition(
+          p => { userPos = { lat: p.coords.latitude, lon: p.coords.longitude }; resolve(userPos); },
+          () => resolve(null),
+          { timeout: 8000 }
+        );
+        if (allowPrompt) { go(); return; }
+        if (navigator.permissions && navigator.permissions.query) {
+          navigator.permissions.query({ name: "geolocation" })
+            .then(s => { if (s.state === "granted") go(); else resolve(null); })
+            .catch(() => resolve(null));
+        } else { resolve(null); }
+      });
+    }
+
+    function addChatMsg(text, who) {
+      const box = document.getElementById("chatMsgs");
+      const d = document.createElement("div");
+      d.className = "msg " + who;
+      d.textContent = text;
+      box.appendChild(d);
+      box.scrollTop = box.scrollHeight;
+      return d;
+    }
+
+    function toggleChat() {
+      const panel = document.getElementById("chatPanel");
+      const isOpen = panel.style.display !== "none";
+      panel.style.display = isOpen ? "none" : "flex";
+      if (!isOpen) {
+        const box = document.getElementById("chatMsgs");
+        if (box.children.length === 0) {
+          addChatMsg("Hi! Ask me about buses in the West Midlands, for example “next bus to Selly Oak”.", "bot");
+        }
+        getPos(false);
+        document.getElementById("chatInput").focus();
+      }
+    }
+
+    async function sendChat(override) {
+      const input = document.getElementById("chatInput");
+      const text = (override || input.value).trim();
+      if (!text) return;
+      input.value = "";
+      addChatMsg(text, "me");
+      const waiting = addChatMsg("…", "bot");
+      try {
+        let url = `${API}/chat?q=${encodeURIComponent(text)}`;
+        // only ask for location when the question needs it ("next bus to X" with no "from")
+        if (/\bto\b/i.test(text) && !/\bfrom\b/i.test(text)) {
+          const pos = await getPos(true);
+          if (pos) url += `&lat=${pos.lat}&lon=${pos.lon}`;
+        }
+        const response = await fetch(url);
+        const data = await response.json();
+        waiting.textContent = data.answer || "Sorry, I didn't get an answer.";
+      } catch (e) {
+        waiting.textContent = "Couldn't reach the server. Is it running?";
+      }
+      document.getElementById("chatMsgs").scrollTop = document.getElementById("chatMsgs").scrollHeight;
+    }
+
+    document.getElementById("chatInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") sendChat();
+    });
+    document.getElementById("chatSuggest").addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (b) sendChat(b.dataset.q);
+    });
+        // ---------- compact trip cards (Google-Maps style) ----------
+    function shiftTime(t, deltaMin) {
+      const parts = String(t).split(":").map(Number);
+      const total = ((parts[0] * 60 + parts[1] + deltaMin) % 1440 + 1440) % 1440;
+      return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}:00`;
+    }
+    function everyText(t) {
+      const m = /every (\d+) min/.exec(t.frequency || "");
+      return m ? `every ${m[1]} min` : "";
+    }
+    function linePill(line) { return `<span class="line-pill">${escapeHtml(line)}</span>`; }
+
+    function compactCard(t, startTime, endTime, chainHtml, boardLine, subText) {
+      const card = document.createElement("div");
+      card.className = `trip-card compact ${t.status}`;
+      const showReason = t.status !== "recommended" && t.reason;
+      card.innerHTML = `
+        <div class="compact-top">
+          <div class="compact-times">${formatTime(startTime)} – ${formatTime(endTime)}</div>
+          <div class="compact-dur">${t.duration_minutes} min</div>
+        </div>
+        <span class="tag ${t.status}" style="margin:6px 0 0 0;">${t.status_label}</span>
+        <div class="compact-chain">${chainHtml}</div>
+        <div class="compact-meta">${boardLine}</div>
+        ${subText ? `<div class="compact-sub">${subText}</div>` : ""}
+        ${showReason ? `<div class="compact-reason">${t.reason}</div>` : ""}
+        <button class="compact-details">Details</button>
+      `;
+      card.onclick = () => openDetailView(t);
+      return card;
+    }
+
+    function buildDirectCard(t) {
+      const chain = `<span>🚶</span><span class="leg-sep">›</span><span>🚌</span>${linePill(t.line_name)}`;
+      const every = everyText(t);
+      const board = `${formatTime(t.depart_time)} from ${escapeHtml(selectedFromStop || "your stop")}`;
+      return compactCard(t, t.depart_time, t.arrive_time, chain, board, every ? `🕐 ${every}` : "");
+    }
+
+    function buildTransferCard(t) {
+      const startWalk = t.start_walk_minutes || 0;
+      const changeWalk = (t.walk_meters !== null && t.walk_meters !== undefined) ? Math.max(1, Math.round(t.walk_meters / 84)) : null;
+      let chain = `<span>🚶 ${startWalk} min</span><span class="leg-sep">›</span><span>🚌</span>${linePill(t.line1)}`;
+      chain += `<span class="leg-sep">›</span>`;
+      if (changeWalk !== null) chain += `<span>🚶 ${changeWalk} min</span><span class="leg-sep">›</span>`;
+      chain += `<span>🚌</span>${linePill(t.line2)}`;
+      const boardStop = t.board_stop || selectedFromStop || "your stop";
+      const board = `${formatTime(t.depart1)} from ${escapeHtml(boardStop)}`;
+      const bits = [];
+      if (changeWalk !== null) bits.push(`🚶 ${changeWalk} min to change buses`);
+      const every = everyText(t);
+      if (every) bits.push(`🕐 ${every}`);
+      return compactCard(t, shiftTime(t.depart1, -startWalk), t.arrive2, chain, board, bits.join(" · "));
+    }
+
+    // first screen
+    renderChips();
+  </script>
+
+</body>
+</html>
